@@ -5,11 +5,11 @@
 
 int timeSpan = 4;
 int counter = 0;
-int washSpeed = 100;
-int cleanSpeed = 100;
-int spinSpeed = 100;
-boolean isForward = true;
-boolean interrupt = false;
+int washSpeed = 20;
+int cleanSpeed = 70;
+int spinSpeed = 120;
+boolean isForward;
+boolean interrupt;
 
 void setup() {
   // put your setup code here, to run once:
@@ -44,6 +44,7 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
+  
   select(WASH);
   
 }
@@ -51,22 +52,24 @@ void loop() {
 void select(int mode){
   switch(mode){
     case WASH:
-      wash(washSpeed, isForward);
+      wash(washSpeed);
     case CLEAN:
-      interrupt = false;
-      wash(cleanSpeed, isForward);
-    case SPIN:
-    interrupt = false;
-      wash(spinSpeed, isForward);
+      clean(cleanSpeed);
+    case SPIN: 
+      spin(spinSpeed);
       break;
     default:
       break;
   }
 }
 
-void wash(int speed, int isForward){
+void wash(int speed){
+  counter = 0;
+  TCNT1  = 0;//initialize counter value to 0
   TIMSK1 |= (1 << OCIE1A);
-  while(interrupt){
+  interrupt = false;
+  isForward = true;
+  while(!interrupt){
     if(isForward){
       OCR2A  = speed;          
       OCR2B  = speed; 
@@ -79,13 +82,16 @@ void wash(int speed, int isForward){
     
 }
 
-void clean(int speed, int isForward){
+void clean(int speed){
+  counter = 0;
   TCNT1  = 0;//initialize counter value to 0
   TIMSK1 |= (1 << OCIE1A);
-  while(interrupt){
+  interrupt = false;
+  isForward = true;
+  while(!interrupt){
     if(isForward){
       OCR2A  = speed;          
-      OCR2B  = speed;  
+      OCR2B  = speed; 
     }else{
       OCR2A  = MAX - speed;          
       OCR2B  = MAX - speed; 
@@ -94,9 +100,11 @@ void clean(int speed, int isForward){
 }
 
 void spin(int speed){
+  counter = 0;
   TCNT1  = 0;//initialize counter value to 0
   TIMSK1 |= (1 << OCIE1A);
-  while(interrupt){
+  interrupt = false;
+  while(!interrupt){
     OCR2A  = speed;         
     OCR2B  = speed;  
   }
