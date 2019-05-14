@@ -1,21 +1,64 @@
+#include <avr/io.h>
+#include <avr/interrupt.h>
+
 #define MAX 255
 #define WASH 0
 #define CLEAN 1
 #define SPIN 2
 
-int timeSpan = 4;
+/****************/
+/* pin config       */
+/* pin D3: PWM             */
+/* pin D11: inv PWM             */
+/* pin D4  start*/
+/* pin D5  palse*/
+/* pin D6  end*/
+/* pin D7  wash*/
+/* pin D8  clean*/
+/* pin D9  spin*/
+/****************/
+
+/****************/
+/*timer config*/
+/*Timer 1: finishing interrupt*/
+/*Timer 2: PWM*/
+/****************/
+
+
+const int timeSpan = 4;
 int counter = 0;
-int washSpeed = 20;
-int cleanSpeed = 70;
-int spinSpeed = 120;
+const int washSpeed = 20;
+const int cleanSpeed = 70;
+const int spinSpeed = 120;
 boolean isForward;
 boolean interrupt;
+
+const byte startButtonInterruptPin = 4;
+const byte palseWashButtonInterruptPin = 5;
+const byte endWashButtonInterruptPin = 6;
+const byte washButtonInterruptPin = 7;
+const byte cleanWashButtonInterruptPin = 8;
+const byte spinButtonInterruptPin = 9;
+volatile byte stop = LOW;
+
 
 void setup() {
   // put your setup code here, to run once:
   cli();
   pinMode(3, OUTPUT);
   pinMode(11, OUTPUT);
+
+  EICRA &= ~(bit(ISC00) | bit (ISC01));  // clear existing flags
+  EICRA |=  bit (ISC01);    // set wanted flags (falling edge interrupt)
+  EIFR   =  bit (INTF0);    // clear flag for interrupt 0
+  EIMSK |=  bit (INT0);     // enable it
+
+  pinMode (startButtonInterruptPin, INPUT_PULLUP);
+  pinMode (palseWashButtonInterruptPin, INPUT_PULLUP);
+  pinMode (endWashButtonInterruptPin, INPUT_PULLUP);
+  pinMode (washButtonInterruptPin, INPUT_PULLUP);
+  pinMode (cleanWashButtonInterruptPin, INPUT_PULLUP);
+  pinMode (spinButtonInterruptPin, INPUT_PULLUP);
   
   TCCR1A = 0;// set entire TCCR1A register to 0
   TCCR1B = 0;// same for TCCR1B
@@ -121,20 +164,27 @@ ISR(TIMER1_COMPA_vect){
     }
 }
 
-//const byte ledPin = 13;
-//const byte interruptPin = 2;
-//volatile byte stop = LOW;
-
-//void setup() {
-//  pinMode(interruptPin, INPUT_PULLUP);
-//  attachInterrupt(digitalPinToInterrupt(interruptPin), stopISR, CHANGE);
-//  attachInterrupt(digitalPinToInterrupt(interruptPin), stopISR, CHANGE);
-//}
-//
-//void stopISR() {
-//  stop = !stop;
-//  while(stop){
-//    delay(200);
-//  }
-//  
-//}
+/****************/
+/* pin config       */
+/* pin D4  start*/
+/* pin D5  palse*/
+/* pin D6  end*/
+/* pin D7  wash*/
+/* pin D8  clean*/
+/* pin D9  spin*/
+/****************/
+ISR (INT0_vect){
+  if (PIND & bit (4)){
+//    start
+ }else if (PIND & bit (5)){
+    
+ }else if(PIND & bit (6)){
+  
+ }else if(PIND & bit (7)){
+  
+ }else if(PIND & bit (8)){
+  
+ }else if(PIND & bit (9)){
+  
+ }
+}
