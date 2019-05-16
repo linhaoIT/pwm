@@ -22,7 +22,6 @@
 /*        Timer 2: PWM          */
 /********************************/
 
-
 const int timeSpan = 4;
 int counter = 0;
 const int washSpeed = 20;
@@ -30,15 +29,15 @@ const int cleanSpeed = 70;
 const int spinSpeed = 120;
 boolean isForward;
 boolean interrupt;
-int mode = 0;
+int mode = -1;
 boolean start = false;
 
-const byte startButtonInterruptPin = 4;
-const byte palseWashButtonInterruptPin = 5;
-const byte endWashButtonInterruptPin = 6;
-const byte washButtonInterruptPin = 7;
-const byte cleanWashButtonInterruptPin = 8;
-const byte spinButtonInterruptPin = 9;
+const int startButtonInterruptPin = 4;
+const int palseWashButtonInterruptPin = 5;
+const int endWashButtonInterruptPin = 6;
+const int washButtonInterruptPin = 7;
+const int cleanWashButtonInterruptPin = 8;
+const int spinButtonInterruptPin = 9;
 volatile byte stop = LOW;
 
 
@@ -47,7 +46,9 @@ void setup() {
   cli();
   pinMode(3, OUTPUT);
   pinMode(11, OUTPUT);
-
+  //test
+  pinMode(12, OUTPUT);    // sets the digital pin 12 as output
+  //test
   EICRA &= ~(bit(ISC00) | bit (ISC01));  // clear existing flags
   EICRA |=  bit (ISC01);    // set wanted flags (falling edge interrupt)
   EIFR   =  bit (INTF0);    // clear flag for interrupt 0
@@ -83,12 +84,16 @@ void setup() {
   OCR2A  = 127;          // duty cycle ~ 1/3
   OCR2B  = 127;          // same signal, complemented
   sei();
+  SREG |= (1 << I);
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-  while(start && mode != -1){
-    start = false;
+  while(!start){
+    if(mode == -1){
+      start = false;
+    }
+    delay(500);
   }
   select(mode);
   mode = -1;
@@ -96,11 +101,11 @@ void loop() {
 
 void select(int mode){
   switch(mode){
-    case WASH:
+    case 0:
       wash(washSpeed);
-    case CLEAN:
+    case 1:
       clean(cleanSpeed);
-    case SPIN: 
+    case 2: 
       spin(spinSpeed);
       break;
     default:
@@ -176,16 +181,23 @@ ISR(TIMER1_COMPA_vect){
 /* pin D9  spin*/
 /****************/
 ISR (INT0_vect){
+  delay(500);
   if (PIND & bit (4)){
   start = true;
+  //test
+  digitalWrite(12, HIGH);
+  
  }else if (PIND & bit (5)){
   start = false;
-  
+  //read speed
+  //TODO
    while(!start){
     
    }
+   //resume speed
  }else if(PIND & bit (6)){
-   
+   //end
+   digitalWrite(12, LOW);
  }else if(PIND & bit (7)){
   mode = 0;
  }else if(PIND & bit (8)){
