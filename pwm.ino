@@ -2,27 +2,25 @@
 #include <avr/interrupt.h>
 
 #define MAX 255
-#define WASH 0
-#define CLEAN 1
-#define SPIN 2
 
-/****************/
-/* pin config       */
-/* pin D3: PWM             */
-/* pin D11: inv PWM             */
-/* pin D4  start*/
-/* pin D5  palse*/
-/* pin D6  end*/
-/* pin D7  wash*/
-/* pin D8  clean*/
-/* pin D9  spin*/
-/****************/
 
-/****************/
-/*timer config*/
-/*Timer 1: finishing interrupt*/
-/*Timer 2: PWM*/
-/****************/
+/********************************/
+/*          pin config          */
+/*          pin D3: PWM         */
+/*          pin D11: inv PWM    */
+/*          pin D4  start       */
+/*          pin D5  palse       */
+/*          pin D6  end         */
+/*          pin D7  wash        */
+/*          pin D8  clean       */
+/*          pin D9  spin        */
+/********************************/
+
+/********************************/
+/*         Timer config         */
+/* Timer 1: finishing interrupt */
+/*        Timer 2: PWM          */
+/********************************/
 
 
 const int timeSpan = 4;
@@ -32,6 +30,8 @@ const int cleanSpeed = 70;
 const int spinSpeed = 120;
 boolean isForward;
 boolean interrupt;
+int mode = 0;
+boolean start = false;
 
 const byte startButtonInterruptPin = 4;
 const byte palseWashButtonInterruptPin = 5;
@@ -87,9 +87,11 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  
-  select(WASH);
-  
+  while(start && mode != -1){
+    start = false;
+  }
+  select(mode);
+  mode = -1;
 }
 
 void select(int mode){
@@ -175,16 +177,20 @@ ISR(TIMER1_COMPA_vect){
 /****************/
 ISR (INT0_vect){
   if (PIND & bit (4)){
-//    start
+  start = true;
  }else if (PIND & bit (5)){
+  start = false;
+  
+   while(!start){
     
+   }
  }else if(PIND & bit (6)){
-  
+   
  }else if(PIND & bit (7)){
-  
+  mode = 0;
  }else if(PIND & bit (8)){
-  
+  mode = 1;
  }else if(PIND & bit (9)){
-  
+  mode = 2;
  }
 }
