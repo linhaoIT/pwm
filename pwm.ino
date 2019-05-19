@@ -43,7 +43,9 @@ volatile byte stop = LOW;
 
 void setup() {
   // put your setup code here, to run once:
+  Serial.begin(9600);
   cli();
+  
   pinMode(3, OUTPUT);
   pinMode(11, OUTPUT);
   //test
@@ -81,14 +83,17 @@ void setup() {
        | _BV(WGM20)   // fast PWM
        | _BV(WGM21);  // ditto
   TCCR2B = _BV(CS10);   // clock at F_CPU / 1
-  OCR2A  = 127;          // duty cycle ~ 1/3
-  OCR2B  = 127;          // same signal, complemented
+  OCR2A  = 240;          // duty cycle ~ 1/3
+  OCR2B  = 240;          // same signal, complemented
   sei();
-  SREG |= (1 << I);
 }
 
-void loop() {
+void loop() { 
   // put your main code here, to run repeatedly:
+  Serial.println("Nothing happened"); 
+  while(true){
+    delay(500);
+  }
   while(!start){
     if(mode == -1){
       start = false;
@@ -182,27 +187,23 @@ ISR(TIMER1_COMPA_vect){
 /****************/
 ISR (INT0_vect){
   delay(500);
-  if (PIND & bit (4)){
+  if (PIND & bit (0)){
   start = true;
   //test
-  digitalWrite(12, HIGH);
+  Serial.print("Good"); 
   
- }else if (PIND & bit (5)){
-  start = false;
-  //read speed
-  //TODO
-   while(!start){
-    
-   }
-   //resume speed
- }else if(PIND & bit (6)){
+ }else if(PIND & bit (2)){
    //end
+   Serial.print("Bad"); 
    digitalWrite(12, LOW);
- }else if(PIND & bit (7)){
+ }else if(PIND & bit (4)){
   mode = 0;
- }else if(PIND & bit (8)){
+  Serial.print("Bad"); 
+ }else if(PIND & bit (5)){
   mode = 1;
- }else if(PIND & bit (9)){
+  Serial.print("Bad"); 
+ }else if(PIND & bit (6)){
   mode = 2;
+  Serial.print("Bad"); 
  }
 }
