@@ -8,7 +8,7 @@
 
 /********************************/
 /*          pin config          */
-/*          pin D3: PWM         */
+/*          pin D10: PWM         */
 /*          pin D11: inv PWM    */
 /*          pin D4  start       */
 /*          pin D5  palse       */
@@ -48,7 +48,7 @@ void setup() {
   // put your setup code here, to run once:
   cli();
   
-  pinMode(3, OUTPUT);
+  pinMode(10, OUTPUT);
   pinMode(11, OUTPUT);
   //test
   Serial.begin(9600);
