@@ -33,6 +33,7 @@ boolean isForward;
 boolean interrupt;
 int mode = -1;
 boolean isRunning = false;
+boolean forceStop = false;
 
 
 const byte ledPin = 12;
@@ -97,7 +98,8 @@ void setup() {
 
 
 
-void loop() { 
+void loop() {
+   
   while(!isRunning){
     if(mode == -1){
       isRunning = false;
@@ -107,16 +109,26 @@ void loop() {
   select(mode);
   mode = -1;
   isRunning = false;
+  forceStop = false;
 }
 
 void select(int mode){
   switch(mode){
     case WASH:
       wash(washSpeed);
+      if(forceStop){
+        return;
+      }
     case CLEAN:
       clean(cleanSpeed);
+      if(forceStop){
+        return;
+      }
     case SPIN: 
       spin(spinSpeed);
+      if(forceStop){
+        return;
+      }
       break;
     default:
       break;
@@ -130,6 +142,9 @@ void wash(int speed){
   interrupt = false;
   isForward = true;
   while(!interrupt){
+    if(forceStop){
+        return;
+     }
     if(isForward){
       OCR2A  = speed;          
       OCR2B  = speed; 
@@ -151,6 +166,9 @@ void clean(int speed){
   interrupt = false;
   isForward = true;
   while(!interrupt){
+    if(forceStop){
+        return;
+     }
     if(isForward){
       OCR2A  = speed;          
       OCR2B  = speed; 
@@ -169,6 +187,9 @@ void spin(int speed){
   TIMSK1 |= (1 << OCIE1A);
   interrupt = false;
   while(!interrupt){
+    if(forceStop){
+        return;
+    }
     OCR2A  = speed;         
     OCR2B  = speed;  
     Serial.println("Spining");
@@ -237,5 +258,5 @@ void end() {
   isRunning = false;
   OCR2A  = 127;          // duty cycle ~ 1/2
   OCR2B  = 127;          // same signal, complemented
-  loop();
+  forceStop = true;
 }
