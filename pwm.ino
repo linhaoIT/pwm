@@ -42,8 +42,6 @@ const byte washInterruptPin = 4;
 const byte cleanInterruptPin = 5;
 const byte spinInterruptPin = 6;
 
-volatile byte stop = LOW;
-
 
 void setup() {
   // put your setup code here, to run once:
@@ -91,13 +89,15 @@ void setup() {
        | _BV(WGM20)   // fast PWM
        | _BV(WGM21);  // ditto
   TCCR2B = _BV(CS10);   // clock at F_CPU / 1
-  OCR2A  = 240;          // duty cycle ~ 1/3
-  OCR2B  = 240;          // same signal, complemented
+  OCR2A  = 127;          // duty cycle ~ 1/2
+  OCR2B  = 127;          // same signal, complemented
   sei();
 }
 
+
+
+
 void loop() { 
-  
   while(!isRunning){
     if(mode == -1){
       isRunning = false;
@@ -106,6 +106,7 @@ void loop() {
   }
   select(mode);
   mode = -1;
+  isRunning = false;
 }
 
 void select(int mode){
@@ -132,9 +133,11 @@ void wash(int speed){
     if(isForward){
       OCR2A  = speed;          
       OCR2B  = speed; 
+      Serial.println("Washing Forward");
     }else{
       OCR2A  = MAX - speed;          
       OCR2B  = MAX - speed; 
+      Serial.println("Washing Backward");
     }
     
   }
@@ -151,9 +154,11 @@ void clean(int speed){
     if(isForward){
       OCR2A  = speed;          
       OCR2B  = speed; 
+      Serial.println("Cleaning Forward");
     }else{
       OCR2A  = MAX - speed;          
       OCR2B  = MAX - speed; 
+      Serial.println("Cleaning Backward");
     }
   }
 }
@@ -166,6 +171,7 @@ void spin(int speed){
   while(!interrupt){
     OCR2A  = speed;         
     OCR2B  = speed;  
+    Serial.println("Spining");
   }
 }
 
@@ -207,15 +213,29 @@ ISR (PCINT2_vect)
 }    // end of PCINT2_vect
 
 
+
+
 void start() {
-  Serial.println("abc");
+    Serial.println("Start...");
   if(!isRunning){
     isRunning = true;
-  }else{
-    
+//  }else{
+//    //todo
+//    //stop the watch
+//    Serial.println("Palse...");
+//    isRunning = false;
+//    while(!isRunning){
+//      
+//    }
   }
 }
 
 void end() {
-  digitalWrite(ledPin, HIGH);
+//  digitalWrite(ledPin, HIGH);
+  Serial.println("Kill");
+  mode = -1;
+  isRunning = false;
+  OCR2A  = 127;          // duty cycle ~ 1/2
+  OCR2B  = 127;          // same signal, complemented
+  loop();
 }
