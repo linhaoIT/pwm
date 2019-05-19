@@ -2,7 +2,9 @@
 #include <avr/interrupt.h>
 
 #define MAX 255
-
+#define WASH 0
+#define CLEAN 1
+#define SPIN 2
 
 /********************************/
 /*          pin config          */
@@ -30,39 +32,45 @@ const int spinSpeed = 120;
 boolean isForward;
 boolean interrupt;
 int mode = -1;
-boolean start = false;
+boolean isRunning = false;
 
-const int startButtonInterruptPin = 4;
-const int palseWashButtonInterruptPin = 5;
-const int endWashButtonInterruptPin = 6;
-const int washButtonInterruptPin = 7;
-const int cleanWashButtonInterruptPin = 8;
-const int spinButtonInterruptPin = 9;
+
+const byte ledPin = 12;
+const byte startInterruptPin = 2;
+const byte stopInterruptPin2 = 3;
+const byte washInterruptPin = 4;
+const byte cleanInterruptPin = 5;
+const byte spinInterruptPin = 6;
+
 volatile byte stop = LOW;
 
 
 void setup() {
   // put your setup code here, to run once:
-  Serial.begin(9600);
   cli();
   
   pinMode(3, OUTPUT);
   pinMode(11, OUTPUT);
   //test
-  pinMode(12, OUTPUT);    // sets the digital pin 12 as output
-  //test
-  EICRA &= ~(bit(ISC00) | bit (ISC01));  // clear existing flags
-  EICRA |=  bit (ISC01);    // set wanted flags (falling edge interrupt)
-  EIFR   =  bit (INTF0);    // clear flag for interrupt 0
-  EIMSK |=  bit (INT0);     // enable it
-
-  pinMode (startButtonInterruptPin, INPUT_PULLUP);
-  pinMode (palseWashButtonInterruptPin, INPUT_PULLUP);
-  pinMode (endWashButtonInterruptPin, INPUT_PULLUP);
-  pinMode (washButtonInterruptPin, INPUT_PULLUP);
-  pinMode (cleanWashButtonInterruptPin, INPUT_PULLUP);
-  pinMode (spinButtonInterruptPin, INPUT_PULLUP);
+  Serial.begin(9600);
+  // pin change interrupt (example for D4)
+  PCMSK2 |= bit (PCINT20);
+  PCMSK2 |= bit (PCINT21);  // want pin 4
+  PCMSK2 |= bit (PCINT22);  // want pin 4
   
+  PCIFR  |= bit (PCIF2);    // clear any outstanding interrupts
+  PCICR  |= bit (PCIE2);    // enable pin change interrupts for D0 to D7
+  
+  pinMode(startInterruptPin, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(startInterruptPin), start, FALLING);
+  pinMode(stopInterruptPin2, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(stopInterruptPin2), end, FALLING);
+
+  pinMode (washInterruptPin, INPUT_PULLUP);
+  pinMode (cleanInterruptPin, INPUT_PULLUP);
+  pinMode (spinInterruptPin, INPUT_PULLUP);
+  pinMode (12, OUTPUT);
+    
   TCCR1A = 0;// set entire TCCR1A register to 0
   TCCR1B = 0;// same for TCCR1B
   TCNT1  = 0;//initialize counter value to 0
@@ -76,7 +84,7 @@ void setup() {
   //TIMSK1 |= (1 << OCIE1A);
 
 
-  
+ 
   TCCR2A = _BV(COM2A1)  // non-inverting PWM on OC2A
        | _BV(COM2B0)  // PWM on OC2B:
        | _BV(COM2B1)  //    inverting mode
@@ -89,16 +97,12 @@ void setup() {
 }
 
 void loop() { 
-  // put your main code here, to run repeatedly:
-  Serial.println("Nothing happened"); 
-  while(true){
-    delay(500);
-  }
-  while(!start){
+  
+  while(!isRunning){
     if(mode == -1){
-      start = false;
+      isRunning = false;
     }
-    delay(500);
+    delay(50);
   }
   select(mode);
   mode = -1;
@@ -106,11 +110,11 @@ void loop() {
 
 void select(int mode){
   switch(mode){
-    case 0:
+    case WASH:
       wash(washSpeed);
-    case 1:
+    case CLEAN:
       clean(cleanSpeed);
-    case 2: 
+    case SPIN: 
       spin(spinSpeed);
       break;
     default:
@@ -185,25 +189,33 @@ ISR(TIMER1_COMPA_vect){
 /* pin D8  clean*/
 /* pin D9  spin*/
 /****************/
-ISR (INT0_vect){
-  delay(500);
-  if (PIND & bit (0)){
-  start = true;
-  //test
-  Serial.print("Good"); 
+
+ISR (PCINT2_vect)
+{
+  // handle pin change interrupt for D0 to D7 here
+  if (PIND & bit (4)) {
+   mode = WASH;
+  }
+  else if (PIND & bit (5)) {
+   mode = CLEAN;
+  }
+  else if (PIND & bit (6)) {
+   mode = SPIN;
+  }
+
   
- }else if(PIND & bit (2)){
-   //end
-   Serial.print("Bad"); 
-   digitalWrite(12, LOW);
- }else if(PIND & bit (4)){
-  mode = 0;
-  Serial.print("Bad"); 
- }else if(PIND & bit (5)){
-  mode = 1;
-  Serial.print("Bad"); 
- }else if(PIND & bit (6)){
-  mode = 2;
-  Serial.print("Bad"); 
- }
+}    // end of PCINT2_vect
+
+
+void start() {
+  Serial.println("abc");
+  if(!isRunning){
+    isRunning = true;
+  }else{
+    
+  }
+}
+
+void end() {
+  digitalWrite(ledPin, HIGH);
 }
