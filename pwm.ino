@@ -5,6 +5,10 @@
 #define WASH 0
 #define CLEAN 1
 #define SPIN 2
+// ADC set up
+#define ANALOGUE_PIN A3
+// # target voltage (5V ~ 1024, 0V~0)
+#define TARGET 500
 
 /********************************/
 /*          pin config          */
@@ -28,7 +32,7 @@
 const int timeSpan = 8;
 int counter = 0;
 const int washSpeed = 255;
-const int cleanSpeed = 50;
+const int cleanSpeed = 200;
 const int spinSpeed = 200;
 boolean isForward;
 boolean interrupt;
@@ -44,10 +48,13 @@ int firstTime = true;
 
 const byte ledPin = 12;
 const byte startInterruptPin = 2;
-const byte stopInterruptPin2 = 3;
 const byte washInterruptPin = 4;
 const byte cleanInterruptPin = 5;
 const byte spinInterruptPin = 6;
+const byte stopInterruptPin = 7;
+
+// integral error  
+int error_I = 0;
 
 int get_new_period(int reference, int current_speed);
 
@@ -56,7 +63,7 @@ void setup() {
   // put your setup code here, to run once:
   cli();
   
-  pinMode(10, OUTPUT);
+  pinMode(3, OUTPUT);
   pinMode(11, OUTPUT);
   //test
   Serial.begin(9600);
@@ -64,20 +71,19 @@ void setup() {
   PCMSK2 |= bit (PCINT20);
   PCMSK2 |= bit (PCINT21);  // want pin 4
   PCMSK2 |= bit (PCINT22);  // want pin 4
+  PCMSK2 |= bit (PCINT23);  // want pin 7
   
   PCIFR  |= bit (PCIF2);    // clear any outstanding interrupts
   PCICR  |= bit (PCIE2);    // enable pin change interrupts for D0 to D7
   
   pinMode(startInterruptPin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(startInterruptPin), start, FALLING);
-  pinMode(stopInterruptPin2, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(stopInterruptPin2), end, FALLING);
-
+  
   pinMode (washInterruptPin, INPUT_PULLUP);
   pinMode (cleanInterruptPin, INPUT_PULLUP);
   pinMode (spinInterruptPin, INPUT_PULLUP);
+  pinMode (stopInterruptPin, INPUT_PULLUP);
   pinMode (12, OUTPUT);
-
     
   TCCR1A = 0;// set entire TCCR1A register to 0
   TCCR1B = 0;// same for TCCR1B
@@ -208,18 +214,20 @@ void spin(int speed){
   TCNT1  = 0;//initialize counter value to 0
   TIMSK1 |= (1 << OCIE1A);
   interrupt = false;
-  current_speed = analogRead(A3);
   while(!interrupt){
     while(!isRunning){
-        period = get_new_period(speed, current_speed);
+        delay(20);
      }
      
     if(forceStop){
         return;
     }
+    current_speed = analogRead(ANALOGUE_PIN);
+    speed = get_new_period(speed, current_speed);
     OCR2A  = speed;         
     OCR2B  = speed;  
     Serial.println("Spining");
+    //Serial.println(speed);
   }
 }
 
@@ -256,6 +264,14 @@ ISR (PCINT2_vect)
   else if (PIND & bit (6)) {
    mode = SPIN;
   }
+  else if (PIND & bit(7)) {
+    Serial.println("Kill");
+    mode = -1;
+    isRunning = false;
+    OCR2A  = 127;          // duty cycle ~ 1/2
+    OCR2B  = 127;          // same signal, complemented
+    forceStop = true;
+  }
 
   
 }    // end of PCINT2_vect
@@ -265,7 +281,7 @@ ISR (PCINT2_vect)
 
 void start() {
   cli();
-  delay(50);
+  delay(1000);
   if(!isRunning){
     Serial.println("Start...");
     isRunning = true;
@@ -306,19 +322,36 @@ void end() {
   forceStop = true;
 }
 
+// the closed loop control only works in one direction
+// Pin3 -> Q2&3       Pin 11 -> Q1&4
 int get_new_period(int reference, int current_speed){
-  int k_P;
-  int offset;
-  int error;
-  int period;
-  
-  k_P = 10;
+  reference = TARGET;
+  double k_P;     // proportional gain
+  double k_I;     // integral gain
+  int offset;     // off set used in proportional gain
+  int error_P;    // proportional error
+  int period;     // new period returned to PWM module
+
+// P control
+  k_P = 0.1;
   offset = 0;
+  error_P = reference - current_speed;
 
-  error = current_speed-reference;
+  // I control
+  k_I = 0.05;
+  // manual overflow if error has gone too big
+  if(error_I >= 10000 || error_I <= -10000){
+    error_I = 0;
+  }
+  else{
+    // calcuculate integral error
+    error_I += (error_P/10);
+  }
+  
+  // calculate correction factor
+  period = 127 + error_P * k_P + error_I * k_I;
 
-  period = 127 + error * k_P;
-
+  // manual limits the range of dutu cycle
   if(period>255){
     period = 255; 
   }
