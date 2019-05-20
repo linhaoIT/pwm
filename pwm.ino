@@ -44,10 +44,10 @@ int firstTime = true;
 
 const byte ledPin = 12;
 const byte startInterruptPin = 2;
+const byte stopInterruptPin2 = 3;
 const byte washInterruptPin = 4;
 const byte cleanInterruptPin = 5;
 const byte spinInterruptPin = 6;
-const byte stopInterruptPin = 7;
 
 int get_new_period(int reference, int current_speed);
 
@@ -56,7 +56,7 @@ void setup() {
   // put your setup code here, to run once:
   cli();
   
-  pinMode(3, OUTPUT);
+  pinMode(10, OUTPUT);
   pinMode(11, OUTPUT);
   //test
   Serial.begin(9600);
@@ -64,19 +64,20 @@ void setup() {
   PCMSK2 |= bit (PCINT20);
   PCMSK2 |= bit (PCINT21);  // want pin 4
   PCMSK2 |= bit (PCINT22);  // want pin 4
-  PCMSK2 |= bit (PCINT23);  // want pin 7
   
   PCIFR  |= bit (PCIF2);    // clear any outstanding interrupts
   PCICR  |= bit (PCIE2);    // enable pin change interrupts for D0 to D7
   
   pinMode(startInterruptPin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(startInterruptPin), start, FALLING);
-  
+  pinMode(stopInterruptPin2, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(stopInterruptPin2), end, FALLING);
+
   pinMode (washInterruptPin, INPUT_PULLUP);
   pinMode (cleanInterruptPin, INPUT_PULLUP);
   pinMode (spinInterruptPin, INPUT_PULLUP);
-  pinMode (stopInterruptPin, INPUT_PULLUP);
   pinMode (12, OUTPUT);
+
     
   TCCR1A = 0;// set entire TCCR1A register to 0
   TCCR1B = 0;// same for TCCR1B
@@ -254,14 +255,6 @@ ISR (PCINT2_vect)
   }
   else if (PIND & bit (6)) {
    mode = SPIN;
-  }
-  else if (PIND & bit(7)) {
-    Serial.println("Kill");
-    mode = -1;
-    isRunning = false;
-    OCR2A  = 127;          // duty cycle ~ 1/2
-    OCR2B  = 127;          // same signal, complemented
-    forceStop = true;
   }
 
   
