@@ -8,8 +8,9 @@
 
 /********************************/
 /*          pin config          */
-/*          pin D10: PWM         */
+/*          pin D10: PWM        */
 /*          pin D11: inv PWM    */
+/*          pin A3: ADC Input   */
 /*          pin D4  start       */
 /*          pin D5  palse       */
 /*          pin D6  end         */
@@ -24,31 +25,38 @@
 /*        Timer 2: PWM          */
 /********************************/
 
-const int timeSpan = 4;
+const int timeSpan = 8;
 int counter = 0;
-const int washSpeed = 20;
-const int cleanSpeed = 70;
-const int spinSpeed = 120;
+const int washSpeed = 255;
+const int cleanSpeed = 50;
+const int spinSpeed = 200;
 boolean isForward;
 boolean interrupt;
 int mode = -1;
 boolean isRunning = false;
 boolean forceStop = false;
 
+int speedA;
+int speedB;
+int currentTime;
+int firstTime = true;
+
 
 const byte ledPin = 12;
 const byte startInterruptPin = 2;
-const byte stopInterruptPin2 = 3;
 const byte washInterruptPin = 4;
 const byte cleanInterruptPin = 5;
 const byte spinInterruptPin = 6;
+const byte stopInterruptPin = 7;
+
+int get_new_period(int reference, int current_speed);
 
 
 void setup() {
   // put your setup code here, to run once:
   cli();
   
-  pinMode(10, OUTPUT);
+  pinMode(3, OUTPUT);
   pinMode(11, OUTPUT);
   //test
   Serial.begin(9600);
@@ -56,18 +64,18 @@ void setup() {
   PCMSK2 |= bit (PCINT20);
   PCMSK2 |= bit (PCINT21);  // want pin 4
   PCMSK2 |= bit (PCINT22);  // want pin 4
+  PCMSK2 |= bit (PCINT23);  // want pin 7
   
   PCIFR  |= bit (PCIF2);    // clear any outstanding interrupts
   PCICR  |= bit (PCIE2);    // enable pin change interrupts for D0 to D7
   
   pinMode(startInterruptPin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(startInterruptPin), start, FALLING);
-  pinMode(stopInterruptPin2, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(stopInterruptPin2), end, FALLING);
-
+  
   pinMode (washInterruptPin, INPUT_PULLUP);
   pinMode (cleanInterruptPin, INPUT_PULLUP);
   pinMode (spinInterruptPin, INPUT_PULLUP);
+  pinMode (stopInterruptPin, INPUT_PULLUP);
   pinMode (12, OUTPUT);
     
   TCCR1A = 0;// set entire TCCR1A register to 0
@@ -110,6 +118,7 @@ void loop() {
   mode = -1;
   isRunning = false;
   forceStop = false;
+  firstTime = true;
 }
 
 void select(int mode){
@@ -145,13 +154,19 @@ void wash(int speed){
     if(forceStop){
         return;
      }
+
+     while(!isRunning){
+        delay(20);
+     }
+
+     
     if(isForward){
       OCR2A  = speed;          
       OCR2B  = speed; 
       Serial.println("Washing Forward");
     }else{
       OCR2A  = MAX - speed;          
-      OCR2B  = MAX - speed; 
+      OCR2B  = MAX - speed;
       Serial.println("Washing Backward");
     }
     
@@ -169,6 +184,10 @@ void clean(int speed){
     if(forceStop){
         return;
      }
+
+     while(!isRunning){
+        delay(20);
+     }
     if(isForward){
       OCR2A  = speed;          
       OCR2B  = speed; 
@@ -182,11 +201,18 @@ void clean(int speed){
 }
 
 void spin(int speed){
+  int period;
+  int current_speed;
   counter = 0;
   TCNT1  = 0;//initialize counter value to 0
   TIMSK1 |= (1 << OCIE1A);
   interrupt = false;
+  current_speed = analogRead(A3);
   while(!interrupt){
+    while(!isRunning){
+        period = get_new_period(speed, current_speed);
+     }
+     
     if(forceStop){
         return;
     }
@@ -229,6 +255,14 @@ ISR (PCINT2_vect)
   else if (PIND & bit (6)) {
    mode = SPIN;
   }
+  else if (PIND & bit(7)) {
+    Serial.println("Kill");
+    mode = -1;
+    isRunning = false;
+    OCR2A  = 127;          // duty cycle ~ 1/2
+    OCR2B  = 127;          // same signal, complemented
+    forceStop = true;
+  }
 
   
 }    // end of PCINT2_vect
@@ -237,18 +271,36 @@ ISR (PCINT2_vect)
 
 
 void start() {
-    Serial.println("Start...");
+  cli();
+  delay(50);
   if(!isRunning){
+    Serial.println("Start...");
     isRunning = true;
-//  }else{
-//    //todo
-//    //stop the watch
-//    Serial.println("Palse...");
-//    isRunning = false;
-//    while(!isRunning){
-//      
-//    }
+    if(!firstTime){
+      OCR2A = speedA;
+      OCR2B = speedB;
+      TCNT1 = currentTime;
+      //turn on the timer
+      TCCR1B |= (1 << CS12) | (1 << CS10);  
+      TIMSK1 |= (1 << OCIE1A);
+    }
+  }else{
+    //todo
+    //stop the watch
+    Serial.println("Palse...");
+    isRunning = false;
+    speedA = OCR2A;          // duty cycle ~ 1/2
+    speedB = OCR2B;
+    currentTime = TCNT1;
+    firstTime = false;
+    OCR2A = 127;
+    OCR2B = 127;
+    TCCR1B &= B11111010; 
+    TIMSK1 &= B11111101; 
+    //turn off the timer
   }
+  sei();
+  
 }
 
 void end() {
@@ -259,4 +311,26 @@ void end() {
   OCR2A  = 127;          // duty cycle ~ 1/2
   OCR2B  = 127;          // same signal, complemented
   forceStop = true;
+}
+
+int get_new_period(int reference, int current_speed){
+  int k_P;
+  int offset;
+  int error;
+  int period;
+  
+  k_P = 10;
+  offset = 0;
+
+  error = current_speed-reference;
+
+  period = 127 + error * k_P;
+
+  if(period>255){
+    period = 255; 
+  }
+  else if(period < 0){
+    period = 0;
+  }
+  return period;
 }
